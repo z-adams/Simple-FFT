@@ -16,7 +16,12 @@
 
 #include <complex>
 
+#ifdef SIMPLE_FFT_REAL_TYPE
+typedef SIMPLE_FFT_REAL_TYPE real_type;
+#else
 typedef double real_type;
+#endif
+
 typedef std::complex<real_type> complex_type;
 
 //#ifndef __USE_SQUARE_BRACKETS_FOR_ELEMENT_ACCESS_OPERATOR

@@ -1,9 +1,23 @@
-cmake_minimum_required(VERSION 2.6)
+cmake_minimum_required(VERSION 4.0)
+
+set(SIMPLE_FFT_ENABLE_TESTING OFF CACHE BOOL "Enable CTest testing")
+set(SIMPLE_FFT_BUILD_UNIT_TESTS OFF CACHE BOOL "Build SimpleFFT unit tests")
+set(SIMPLE_FFT_BUILD_BENCHMARKS OFF CACHE BOOL "Build SimpleFFT performance benchmarks")
+set(SIMPLE_FFT_REAL_TYPE double CACHE STRING "Real type (float, double) used by SimpleFFT")
+
+if(SIMPLE_FFT_ENABLE_TESTING)
 enable_testing()
+endif()
+
 project(simple_fft)
 
+if(SIMPLE_FFT_BUILD_UNIT_TESTS)
 set(UNIT_TESTS simple_fft_unit_tests)
+endif()
+
+if(SIMPLE_FFT_BUILD_BENCHMARKS)
 set(BENCHMARK_TESTS simple_fft_benchmark_tests)
+endif()
 
 set(HEADERS
         include/simple_fft/fft.h
@@ -14,6 +28,10 @@ set(HEADERS
         include/simple_fft/copy_array.hpp
         include/simple_fft/error_handling.hpp
    )
+
+add_definitions(simplefft INTERFACE -DSIMPLE_FFT_REAL_TYPE=${SIMPLE_FFT_REAL_TYPE})
+add_library(simplefft INTERFACE ${HEADERS})
+target_include_directories(simplefft INTERFACE include)
 
 set(HEADERS_UNIT_TESTS
         ${HEADERS}
@@ -181,10 +199,14 @@ else()
     message(STATUS "FFTW include file was not found, won't build a benchmark test")
 endif()
 
+if(SIMPLE_FFT_BUILD_UNIT_TESTS)
 add_executable(${UNIT_TESTS} ${HEADERS_UNIT_TESTS} ${SOURCES_UNIT_TESTS})
+endif()
+if(SIMPLE_FFT_BUILD_BENCHMARKS)
 add_executable(${BENCHMARK_TESTS} ${HEADERS_BENCHMARK_TESTS} ${SOURCES_BENCHMARK_TESTS})
+endif()
 
-if(FFTW_LIB)
+if(FFTW_LIB AND SIMPLE_FFT_BUILD_BENCHMARKS)
     target_link_libraries(${BENCHMARK_TESTS} ${FFTW_LIB})
     if(FFTW_LIB_OPENMP)
         target_link_libraries(${BENCHMARK_TESTS} ${FFTW_LIB_OPENMP})
@@ -211,7 +233,7 @@ else() # not clang
         message(STATUS "OpenMP not found, parallelization for FFT and tests will be disabled")
     endif() # OpenMP
 
-    if(${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
+    if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
         set(CMAKE_CXX_FLAGS "-fopenmp -lgomp -Wno-unused-parameter -fstrict-aliasing ${CMAKE_CXX_FLAGS}")
         if(${CMAKE_BUILD_TYPE} MATCHES "Debug")
             set(CMAKE_CXX_FLAGS "-Wall -Wextra -Wshadow -Werror -ansi -pedantic-errors ${CMAKE_CXX_FLAGS}")
@@ -222,7 +244,7 @@ else() # not clang
         else() # "Release"
             set(CMAKE_CXX_FLAGS "-O3 -march=native -mtune=native -ffast-math ${CMAKE_CXX_FLAGS}")
         endif()
-    elseif(${CMAKE_CXX_COMPILER_ID} STREQUAL "Intel")
+    elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
         if(OPENMP_FOUND)
             set(CMAKE_CXX_FLAGS "-openmp -parallel ${CMAKE_CXX_FLAGS}")
             find_library(omp5_lib REQUIRED
@@ -230,8 +252,12 @@ else() # not clang
                          libiomp5.so
                          )
             set(LIBS ${LIBS} ${omp5_lib})
+	    if(SIMPLE_FFT_BUILD_UNIT_TESTS)
             target_link_libraries(${UNIT_TESTS} ${omp5_lib})
+	    endif()
+	    if(SIMPLE_FFT_BUILD_BENCHMARKS)
             target_link_libraries(${BENCHMARK_TESTS} ${omp5_lib})
+	    endif()
         endif() # OpenMP
         if(${CMAKE_BUILD_TYPE} MATCHES "Debug")
             set(CMAKE_CXX_FLAGS "-debug -Wall -Werror -Winline -Wdeprecated -Wno-missing-prototypes ${CMAKE_CXX_FLAGS}")
@@ -242,10 +268,10 @@ else() # not clang
         else() # "Release"
             set(CMAKE_CXX_FLAGS "-O3 -march=core-avx-i ${CMAKE_CXX_FLAGS}")
         endif()
-    elseif(${CMAKE_CXX_COMPILER_ID} STREQUAL "MSVC" OR
-           ${CMAKE_CXX_COMPILER_ID} STREQUAL "MSVC10" OR
-           ${CMAKE_CXX_COMPILER_ID} STREQUAL "MSVC80" OR
-           ${CMAKE_CXX_COMPILER_ID} STREQUAL "MSVC90")
+    elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC" OR
+           "${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC10" OR
+           "${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC80" OR
+           "${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC90")
         set(CMAKE_CXX_FLAGS "/D_SCL_SECURE_NO_WARNINGS /D_CRT_SECURE_NO_WARNINGS ${CMAKE_CXX_FLAGS}")
         set(CMAKE_CXX_FLAGS "/wd4100 /wd4503 ${CMAKE_CXX_FLAGS}")
         if(OPENMP_FOUND)
